@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// Use environment variable with a fallback for local development
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://mediguard-ai-xibh.onrender.com/';
+// This will use the value from .env (VITE_API_URL) or fallback to localhost:8000
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
