@@ -17,6 +17,7 @@ venv/
 .vscode/
 
 # FAISS vector store (rebuildable)
+chatbot/vectorstores/
 *.faiss
 *.pkl
 
