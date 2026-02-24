@@ -213,16 +213,59 @@ class MedicalRAG:
     # ==========================================
     # AI-BASED MEDICAL CLASSIFIER
     # ==========================================
-    def is_medical_query(self, query: str) -> bool:
-        if not self.groq_client:
-            return True  # fallback if LLM unavailable
+#     def is_medical_query(self, query: str) -> bool:
+#         if not self.groq_client:
+#             return True  # fallback if LLM unavailable
 
-        classification_prompt = f"""
-You are a strict classifier.
+#         classification_prompt = f"""
+# You are a strict classifier.
 
-Determine if the following user question is medical or health-related.
+# Determine if the following user question is medical or health-related.
 
-Respond ONLY with:
+# Respond ONLY with:
+# MEDICAL
+# or
+# NON_MEDICAL
+
+# Question:
+# {query}
+# """
+
+#         try:
+#             response = self.groq_client.chat.completions.create(
+#                 model=self.model,
+#                 messages=[{"role": "user", "content": classification_prompt}],
+#                 temperature=0,
+#                 max_tokens=5,
+#             )
+
+#             decision = response.choices[0].message.content.strip().upper()
+#             return decision == "MEDICAL"
+
+#         except Exception:
+#             return True  # fail open instead of blocking everything
+
+def is_medical_query(self, query: str) -> bool:
+    if not self.groq_client:
+        return True  # fallback if LLM unavailable
+
+    classification_prompt = f"""
+You are a strict binary classifier.
+
+A question is MEDICAL only if it clearly relates to:
+- diseases
+- symptoms
+- diagnosis
+- treatment
+- medication
+- health conditions
+- mental health
+- injury
+- medical procedures
+
+Everything else is NON_MEDICAL.
+
+Respond with EXACTLY one word:
 MEDICAL
 or
 NON_MEDICAL
@@ -231,19 +274,24 @@ Question:
 {query}
 """
 
-        try:
-            response = self.groq_client.chat.completions.create(
-                model=self.model,
-                messages=[{"role": "user", "content": classification_prompt}],
-                temperature=0,
-                max_tokens=5,
-            )
+    try:
+        response = self.groq_client.chat.completions.create(
+            model=self.model,
+            messages=[{"role": "user", "content": classification_prompt}],
+            temperature=0,
+            max_tokens=3,
+        )
 
-            decision = response.choices[0].message.content.strip().upper()
-            return decision == "MEDICAL"
+        decision = response.choices[0].message.content.strip().upper()
 
-        except Exception:
-            return True  # fail open instead of blocking everything
+        # STRICT decision rule
+        if decision == "MEDICAL":
+            return True
+        else:
+            return False  # default reject
+
+    except Exception:
+        return False  # fail safe (block if unsure)
 
     # ==========================================
     # MAIN RESPONSE FUNCTION
