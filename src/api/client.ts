@@ -14,6 +14,8 @@ export const checkHealth = () => apiClient.get('/health');
 export const predictDiabetes = (data: any) => apiClient.post('/predict/diabetes', data);
 export const predictHeart = (data: any) => apiClient.post('/predict/heart', data);
 export const predictParkinsons = (data: any) => apiClient.post('/predict/parkinsons', data);
+export const predictCancer = (data: any) => apiClient.post('/predict/cancer', data);
+export const predictKidney = (data: any) => apiClient.post('/predict/kidney', data);
 export const sendChatMessage = (message: string) => apiClient.post('/chat', { message });
 
 export default apiClient;

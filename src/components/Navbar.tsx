@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ShieldCheck, Menu, X, Droplets, Heart, Activity, Users } from 'lucide-react';
+import { ShieldCheck, Menu, X, Droplets, Heart, Activity, Users, Microscope, Waves } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -15,8 +15,10 @@ const Navbar = () => {
 
   const navItems = [
     { name: 'Diabetes', path: '/diabetes', icon: <Droplets className="w-4 h-4" /> },
-    { name: 'Heart Disease', path: '/heart', icon: <Heart className="w-4 h-4" /> },
+    { name: 'Heart', path: '/heart', icon: <Heart className="w-4 h-4" /> },
     { name: 'Parkinson\'s', path: '/parkinsons', icon: <Activity className="w-4 h-4" /> },
+    { name: 'Cancer', path: '/cancer', icon: <Microscope className="w-4 h-4" /> },
+    { name: 'Kidney', path: '/kidney', icon: <Waves className="w-4 h-4" /> },
     { name: 'Team', path: '/team', icon: <Users className="w-4 h-4" /> },
   ];
 
@@ -32,7 +34,6 @@ const Navbar = () => {
           <span className="font-bold text-xl tracking-tight text-slate-900">MediGuard</span>
         </Link>
 
-        {/* Desktop Navigation */}
         <div className="hidden md:flex items-center gap-1">
           {navItems.map((item) => (
             <Link key={item.path} to={item.path}>
@@ -52,7 +53,6 @@ const Navbar = () => {
           ))}
         </div>
 
-        {/* Mobile Navigation */}
         <div className="md:hidden">
           <Sheet open={isOpen} onOpenChange={setIsOpen}>
             <SheetTrigger asChild>

@@ -17,7 +17,9 @@ def load_model(filename: str):
         print(f"Error loading {filename}: {e}")
         return None
 
-# Pre-load models (will be None if files don't exist yet)
+# Pre-load models
 diabetes_model = load_model("diabetes_model.sav")
 heart_disease_model = load_model("heart_disease_model.sav")
 parkinsons_model = load_model("parkinsons_model.sav")
+cancer_model = load_model("cancer.pkl")
+kidney_model = load_model("kidney.pkl")

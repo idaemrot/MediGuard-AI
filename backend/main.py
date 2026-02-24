@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import os
 from dotenv import load_dotenv
-from utils import diabetes_model, heart_disease_model, parkinsons_model
+from utils import diabetes_model, heart_disease_model, parkinsons_model, cancer_model, kidney_model
 from chatbot.rag_engine import MedicalRAG
 
 # Load environment variables from .env file
@@ -81,6 +81,54 @@ class ParkinsonsInput(BaseModel):
     d2: float
     ppe: float
 
+class CancerInput(BaseModel):
+    radius_mean: float
+    texture_mean: float
+    perimeter_mean: float
+    area_mean: float
+    smoothness_mean: float
+    compactness_mean: float
+    concavity_mean: float
+    concave_points_mean: float
+    symmetry_mean: float
+    radius_se: float
+    perimeter_se: float
+    area_se: float
+    compactness_se: float
+    concavity_se: float
+    concave_points_se: float
+    fractal_dimension_se: float
+    radius_worst: float
+    texture_worst: float
+    perimeter_worst: float
+    area_worst: float
+    smoothness_worst: float
+    compactness_worst: float
+    concavity_worst: float
+    concave_points_worst: float
+    symmetry_worst: float
+    fractal_dimension_worst: float
+
+class KidneyInput(BaseModel):
+    age: float
+    bp: float
+    al: float
+    su: float
+    rbc: float
+    pc: float
+    pcc: float
+    ba: float
+    bgr: float
+    bu: float
+    sc: float
+    pot: float
+    wc: float
+    htn: float
+    dm: float
+    cad: float
+    pe: float
+    ane: float
+
 class ChatInput(BaseModel):
     message: str
 
@@ -98,7 +146,9 @@ async def health_check():
         "models": {
             "diabetes": diabetes_model is not None,
             "heart": heart_disease_model is not None,
-            "parkinsons": parkinsons_model is not None
+            "parkinsons": parkinsons_model is not None,
+            "cancer": cancer_model is not None,
+            "kidney": kidney_model is not None
         },
         "chatbot": {
             "initialized": rag_engine.is_initialized
@@ -148,6 +198,37 @@ async def predict_parkinsons(data: ParkinsonsInput):
         data.rpde, data.dfa, data.spread1, data.spread2, data.d2, data.ppe
     ]
     prediction = parkinsons_model.predict([features])
+    return {"prediction": int(prediction[0])}
+
+@app.post("/predict/cancer")
+async def predict_cancer(data: CancerInput):
+    if cancer_model is None:
+        raise HTTPException(status_code=503, detail="Cancer model not loaded")
+    
+    features = [
+        data.radius_mean, data.texture_mean, data.perimeter_mean, data.area_mean,
+        data.smoothness_mean, data.compactness_mean, data.concavity_mean,
+        data.concave_points_mean, data.symmetry_mean, data.radius_se,
+        data.perimeter_se, data.area_se, data.compactness_se, data.concavity_se,
+        data.concave_points_se, data.fractal_dimension_se, data.radius_worst,
+        data.texture_worst, data.perimeter_worst, data.area_worst,
+        data.smoothness_worst, data.compactness_worst, data.concavity_worst,
+        data.concave_points_worst, data.symmetry_worst, data.fractal_dimension_worst
+    ]
+    prediction = cancer_model.predict([features])
+    return {"prediction": int(prediction[0])}
+
+@app.post("/predict/kidney")
+async def predict_kidney(data: KidneyInput):
+    if kidney_model is None:
+        raise HTTPException(status_code=503, detail="Kidney model not loaded")
+    
+    features = [
+        data.age, data.bp, data.al, data.su, data.rbc, data.pc, data.pcc,
+        data.ba, data.bgr, data.bu, data.sc, data.pot, data.wc, data.htn,
+        data.dm, data.cad, data.pe, data.ane
+    ]
+    prediction = kidney_model.predict([features])
     return {"prediction": int(prediction[0])}
 
 if __name__ == "__main__":

@@ -6,6 +6,8 @@ import Index from "./pages/Index";
 import Diabetes from "./pages/Diabetes";
 import HeartDisease from "./pages/HeartDisease";
 import Parkinsons from "./pages/Parkinsons";
+import Cancer from "./pages/Cancer";
+import Kidney from "./pages/Kidney";
 import Chat from "./pages/Chat";
 import Team from "./pages/Team";
 import NotFound from "./pages/NotFound";
@@ -27,12 +29,13 @@ const App = () => (
               <Route path="/diabetes" element={<Diabetes />} />
               <Route path="/heart" element={<HeartDisease />} />
               <Route path="/parkinsons" element={<Parkinsons />} />
+              <Route path="/cancer" element={<Cancer />} />
+              <Route path="/kidney" element={<Kidney />} />
               <Route path="/chat" element={<Chat />} />
               <Route path="/team" element={<Team />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </main>
-          {/* Global Floating Chatbot */}
           <FloatingChatbot />
         </div>
       </BrowserRouter>
