@@ -72,10 +72,10 @@ const Team = () => {
                 </div>
                 <div className="flex gap-2 mt-6">
                   <button className="p-2 border border-slate-100 rounded-lg hover:bg-slate-50 transition-colors">
-                    <Mail className="w-4 h-4 text-slate-400" />
+                    {/* <Mail className="w-4 h-4 text-slate-400" /> */}
                   </button>
                   <button className="p-2 border border-slate-100 rounded-lg hover:bg-slate-50 transition-colors">
-                    <Linkedin className="w-4 h-4 text-slate-400" />
+                    {/* <Linkedin className="w-4 h-4 text-slate-400" /> */}
                   </button>
                 </div>
               </CardContent>
