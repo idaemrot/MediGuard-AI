@@ -2,9 +2,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, Loader2, CheckCircle2, AlertCircle, BookOpen } from "lucide-react";
+import { Send, Loader2, CheckCircle2, AlertCircle, BookOpen, Plus } from "lucide-react";
 import { sendChatMessage } from '@/api/client';
 import type { MedicalResponse, ChatMessage as Message } from '@/api/types';
+import { loadChatHistory, saveChatHistory, clearChatHistory } from '@/lib/chatStorage';
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -25,6 +26,40 @@ interface ChatConversationProps {
   className?: string;
 }
 
+/**
+ * Defensive recovery for a confirmed intermittent backend formatting slip: the
+ * LLM occasionally omits the closing "]" for the last array field before the
+ * final "}" (e.g. ...,"seek_care_if":["..."} instead of ...,"seek_care_if":["..."]}).
+ * When that happens, the backend's own JSON parse fails and its fallback puts the
+ * raw (near-valid) JSON text straight into `summary`, with what_to_try/seek_care_if
+ * left empty. Recover the structured fields client-side rather than showing the
+ * raw blob. `sources`/`grounded`/`conversational` are computed independently on
+ * the backend and are unaffected either way, so they're left untouched.
+ */
+function recoverStructuredSummary(content: MedicalResponse): MedicalResponse {
+  const trimmed = content.summary.trim();
+  if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) return content;
+
+  // Try the text as-is first, then the specific missing-bracket repair.
+  const candidates = [trimmed, trimmed.slice(0, -1) + ']}'];
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate);
+      if (parsed && typeof parsed.summary === 'string') {
+        return {
+          ...content,
+          summary: parsed.summary,
+          what_to_try: Array.isArray(parsed.what_to_try) ? parsed.what_to_try : content.what_to_try,
+          seek_care_if: Array.isArray(parsed.seek_care_if) ? parsed.seek_care_if : content.seek_care_if,
+        };
+      }
+    } catch {
+      // Not recoverable this way — try the next candidate, or fall through to raw text.
+    }
+  }
+  return content;
+}
+
 const ChatConversation: React.FC<ChatConversationProps> = ({
   variant = 'full',
   initialMessage,
@@ -32,7 +67,7 @@ const ChatConversation: React.FC<ChatConversationProps> = ({
   className
 }) => {
   const compact = variant === 'compact';
-  const [messages, setMessages] = useState<Message[]>([GREETING]);
+  const [messages, setMessages] = useState<Message[]>(() => loadChatHistory() ?? [GREETING]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -44,6 +79,24 @@ const ChatConversation: React.FC<ChatConversationProps> = ({
       if (viewport) viewport.scrollTop = viewport.scrollHeight;
     }
   }, [messages, isLoading]);
+
+  // Persist on every change. `isLoading` is separate transient state and never
+  // part of `messages`, so in-flight requests are never written to storage.
+  useEffect(() => {
+    saveChatHistory(messages);
+  }, [messages]);
+
+  const handleNewConversation = () => {
+    const hasConversation = messages.some((m) => m.role === 'user');
+    if (hasConversation) {
+      const confirmed = window.confirm(
+        "Start a new conversation? Your current chat will be cleared from this device."
+      );
+      if (!confirmed) return;
+    }
+    clearChatHistory();
+    setMessages([GREETING]);
+  };
 
   const submitMessage = async (text: string) => {
     setMessages(prev => [...prev, { role: 'user', content: text, timestamp: new Date() }]);
@@ -82,6 +135,8 @@ const ChatConversation: React.FC<ChatConversationProps> = ({
   const renderBotMessage = (content: string | MedicalResponse) => {
     if (typeof content === 'string') return content;
 
+    const resolved = recoverStructuredSummary(content);
+
     return (
       <div className={cn("space-y-3", compact && "space-y-2")}>
         {!content.conversational && typeof content.grounded === 'boolean' && (
@@ -93,28 +148,28 @@ const ChatConversation: React.FC<ChatConversationProps> = ({
             {content.grounded ? "Grounded in medical literature" : "General medical guidance"}
           </div>
         )}
-        <p className="leading-relaxed">{content.summary}</p>
+        <p className="leading-relaxed">{resolved.summary}</p>
 
-        {content.what_to_try.length > 0 && (
+        {resolved.what_to_try.length > 0 && (
           <div className="border-l-2 border-border pl-3">
             <div className="flex items-center gap-1.5 mb-1 text-foreground/70 font-semibold text-[11px] uppercase tracking-wide">
               <CheckCircle2 className="w-3 h-3" /> Suggested steps
             </div>
             <ul className="space-y-1">
-              {content.what_to_try.map((item, i) => (
+              {resolved.what_to_try.map((item, i) => (
                 <li key={i} className="text-sm text-foreground/80">{item}</li>
               ))}
             </ul>
           </div>
         )}
 
-        {content.seek_care_if.length > 0 && (
+        {resolved.seek_care_if.length > 0 && (
           <div className="border-l-2 border-destructive/50 pl-3">
             <div className="flex items-center gap-1.5 mb-1 text-destructive font-semibold text-[11px] uppercase tracking-wide">
               <AlertCircle className="w-3 h-3" /> Seek care if
             </div>
             <ul className="space-y-1">
-              {content.seek_care_if.map((item, i) => (
+              {resolved.seek_care_if.map((item, i) => (
                 <li key={i} className="text-sm text-foreground/80">{item}</li>
               ))}
             </ul>
@@ -141,6 +196,23 @@ const ChatConversation: React.FC<ChatConversationProps> = ({
 
   return (
     <div className={cn("flex flex-col border border-border rounded-md bg-card overflow-hidden", className)}>
+      <div className={cn(
+        "flex items-center justify-between gap-3 border-b border-border flex-wrap",
+        compact ? "px-3 py-1.5" : "px-4 py-2"
+      )}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={handleNewConversation}
+          className="h-auto py-1 px-2 gap-1 text-xs text-foreground/70 hover:text-foreground"
+        >
+          <Plus className="w-3.5 h-3.5" /> New conversation
+        </Button>
+        <span className="text-[10px] text-foreground/40">
+          Chat history is stored locally on this device.
+        </span>
+      </div>
       <ScrollArea className={cn("flex-1", compact ? "p-3" : "p-4")} ref={scrollRef}>
         <div className={cn("space-y-4", compact && "space-y-3")}>
           {messages.map((msg, idx) => (
