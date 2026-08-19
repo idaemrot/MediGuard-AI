@@ -1,7 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from "@/components/ui/alert-dialog";
 import { Send, Loader2, CheckCircle2, AlertCircle, BookOpen, Plus } from "lucide-react";
 import { sendChatMessage } from '@/api/client';
 import type { MedicalResponse, ChatMessage as Message } from '@/api/types';
@@ -86,16 +96,25 @@ const ChatConversation: React.FC<ChatConversationProps> = ({
     saveChatHistory(messages);
   }, [messages]);
 
-  const handleNewConversation = () => {
-    const hasConversation = messages.some((m) => m.role === 'user');
-    if (hasConversation) {
-      const confirmed = window.confirm(
-        "Start a new conversation? Your current chat will be cleared from this device."
-      );
-      if (!confirmed) return;
-    }
+  const [showResetDialog, setShowResetDialog] = useState(false);
+
+  const resetConversation = () => {
     clearChatHistory();
     setMessages([GREETING]);
+  };
+
+  const handleNewConversationClick = () => {
+    const hasConversation = messages.some((m) => m.role === 'user');
+    if (!hasConversation) {
+      resetConversation();
+      return;
+    }
+    setShowResetDialog(true);
+  };
+
+  const confirmNewConversation = () => {
+    resetConversation();
+    setShowResetDialog(false);
   };
 
   const submitMessage = async (text: string) => {
@@ -204,7 +223,7 @@ const ChatConversation: React.FC<ChatConversationProps> = ({
           type="button"
           variant="ghost"
           size="sm"
-          onClick={handleNewConversation}
+          onClick={handleNewConversationClick}
           className="h-auto py-1 px-2 gap-1 text-xs text-foreground/70 hover:text-foreground"
         >
           <Plus className="w-3.5 h-3.5" /> New conversation
@@ -268,6 +287,26 @@ const ChatConversation: React.FC<ChatConversationProps> = ({
           <Send className="w-4 h-4" />
         </Button>
       </form>
+
+      <AlertDialog open={showResetDialog} onOpenChange={setShowResetDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Start a new conversation?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Your current conversation will be cleared from this device.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmNewConversation}
+              className={buttonVariants({ variant: "destructive" })}
+            >
+              New conversation
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
