@@ -164,26 +164,9 @@ class MedicalRAG:
         if not self.groq_client:
             return False  # Fail closed if LLM unavailable
 
-        classification_prompt = f"""
-You are a strict binary classifier.
+        classification_prompt = f"""You are a strict binary classifier. Classify the input as MEDICAL only if it clearly relates to: diseases, symptoms, diagnosis, treatment, medication, health conditions, mental health, injury, or medical procedures. Everything else is NON_MEDICAL.
 
-A question is MEDICAL only if it clearly relates to:
-- diseases
-- symptoms
-- diagnosis
-- treatment
-- medication
-- health conditions
-- mental health
-- injury
-- medical procedures
-
-Everything else is NON_MEDICAL.
-
-Respond with EXACTLY one word:
-MEDICAL
-or
-NON_MEDICAL
+Respond with exactly one word: MEDICAL or NON_MEDICAL.
 
 Question:
 {query}
@@ -278,10 +261,7 @@ Question:
             grounded = len(sources) > 0
 
             # JSON enforcement instruction
-            json_format_instruction = """
-Return your response in STRICT JSON format ONLY.
-Do not include markdown, backticks, or any text outside JSON.
-
+            json_format_instruction = """Return STRICT JSON only — no markdown, backticks, or extra text.
 Structure:
 {
   "summary": "A concise medical explanation (max 60 words).",
@@ -294,14 +274,7 @@ Structure:
             if context_matches:
                 context = "\n\n".join([doc.page_content for doc in context_matches])
 
-                prompt = f"""
-You are a professional medical assistant.
-
-Below is retrieved context from a medical encyclopedia. It was matched by semantic
-similarity and may NOT be relevant to the question — do not assume it applies.
-Use it only if it directly supports the answer. If it doesn't help, ignore it
-completely and give safe general medical guidance instead. Never mention the
-retrieval process itself or say things like "the provided context does not contain...".
+                prompt = f"""You are a professional medical assistant. The context below may not be relevant to the question — use it only if it directly supports the answer; otherwise ignore it completely and give safe general medical guidance instead. Never mention the retrieval process itself or say the context doesn't contain the answer.
 
 {json_format_instruction}
 
@@ -312,8 +285,7 @@ User Question:
 {query}
 """
             else:
-                prompt = f"""
-You are a medical assistant providing general safe health guidance.
+                prompt = f"""You are a medical assistant providing general safe health guidance.
 
 {json_format_instruction}
 
@@ -327,7 +299,7 @@ User Question:
                     model=self.model,
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0.2,
-                    max_tokens=400,
+                    max_tokens=250,
                     reasoning_effort="low",
                 )
 
