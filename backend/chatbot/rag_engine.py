@@ -13,6 +13,18 @@ from groq import Groq
 
 DB_FAISS_PATH = Path(__file__).parent / "vectorstores" / "db_faiss"
 
+# FAISS (IndexFlatL2) returns *squared* L2 distance, not plain Euclidean distance.
+# all-MiniLM-L6-v2 embeddings are unit-normalized (verified against the built index:
+# every stored vector has norm ~1.0), so for unit vectors squared_L2 = 2 - 2*cos_sim.
+#
+# Empirically tested against the real index with representative on-topic questions:
+# conversational phrasing of clearly-covered topics (diabetes, hypertension, fever,
+# heart attack) scored 0.68-0.98 squared-L2 distance to their best matching chunk,
+# while off-topic questions (capital of France, cat joke) scored 1.26+. A threshold
+# of 0.65 left nearly all realistic on-topic questions ungrounded; 1.0 covers the
+# on-topic cluster with a clear margin below the off-topic one.
+EVIDENCE_DISTANCE_THRESHOLD = 1.0
+
 
 class MedicalRAG:
     def __init__(self):
@@ -33,7 +45,8 @@ class MedicalRAG:
         try:
             # Load embeddings
             self.embeddings = HuggingFaceEmbeddings(
-                model_name="sentence-transformers/all-MiniLM-L6-v2"
+                model_name="sentence-transformers/all-MiniLM-L6-v2",
+                encode_kwargs={"normalize_embeddings": True}
             )
 
             # Load FAISS
@@ -101,11 +114,13 @@ Question:
                 model=self.model,
                 messages=[{"role": "user", "content": classification_prompt}],
                 temperature=0,
-                max_tokens=3,
+                max_tokens=5,
             )
 
             decision = response.choices[0].message.content.strip().upper()
-            return decision == "MEDICAL"
+            # Check for the NON_MEDICAL prefix rather than exact-matching "MEDICAL":
+            # a truncated/punctuated reply like "MEDICAL." still correctly classifies as medical.
+            return not decision.startswith("NON")
 
         except Exception:
             return False  # Fail safe
@@ -118,7 +133,9 @@ Question:
             return {
                 "summary": "The medical assistant is still initializing.",
                 "what_to_try": [],
-                "seek_care_if": []
+                "seek_care_if": [],
+                "sources": [],
+                "grounded": False
             }
 
         try:
@@ -127,17 +144,42 @@ Question:
                 return {
                     "summary": "I'm a medical assistant and can only answer health-related questions.",
                     "what_to_try": [],
-                    "seek_care_if": []
+                    "seek_care_if": [],
+                    "sources": [],
+                    "grounded": False
                 }
 
-            # Step 2: Retrieve documents if FAISS available
+            # Step 2: Retrieve documents if FAISS available.
+            # Two separate notions of "relevant" here, deliberately decoupled:
+            #  - context_matches: the top 3 nearest chunks regardless of distance, given
+            #    to the LLM as *candidate* context. The prompt instructs it to ignore
+            #    anything that doesn't actually support the answer, so a borderline or
+            #    irrelevant chunk can't hurt — it just doesn't get used.
+            #  - strong_matches: only chunks that clear EVIDENCE_DISTANCE_THRESHOLD. This
+            #    is the precision-favoring bar used for `sources` and `grounded`, since
+            #    those are shown to the user as cited evidence and a weak match displayed
+            #    as "evidence" would undermine trust rather than support it.
+            context_matches = []
             strong_matches = []
 
             if self.vector_store:
                 results = self.vector_store.similarity_search_with_score(query, k=5)
+                context_matches = [doc for doc, score in results[:3]]
                 strong_matches = [
-                    doc for doc, score in results if score < 0.65
+                    doc for doc, score in results if score < EVIDENCE_DISTANCE_THRESHOLD
                 ]
+
+            # Real retrieved excerpts, deduped, for UI display alongside the answer.
+            # This is also the sole basis for `grounded` below — a passage only counts
+            # as evidence if it cleared the same bar shown to the user.
+            sources = []
+            for doc in strong_matches:
+                excerpt = doc.page_content.strip().replace("\n", " ")
+                excerpt = (excerpt[:200] + "…") if len(excerpt) > 200 else excerpt
+                if excerpt and excerpt not in sources:
+                    sources.append(excerpt)
+
+            grounded = len(sources) > 0
 
             # JSON enforcement instruction
             json_format_instruction = """
@@ -153,17 +195,21 @@ Structure:
 """
 
             # Build prompt
-            if strong_matches:
-                context = "\n\n".join([doc.page_content for doc in strong_matches])
+            if context_matches:
+                context = "\n\n".join([doc.page_content for doc in context_matches])
 
                 prompt = f"""
 You are a professional medical assistant.
-Use ONLY the provided medical literature.
-If the answer is unclear, give safe general medical guidance.
+
+Below is retrieved context from a medical encyclopedia. It was matched by semantic
+similarity and may NOT be relevant to the question — do not assume it applies.
+Use it only if it directly supports the answer. If it doesn't help, ignore it
+completely and give safe general medical guidance instead. Never mention the
+retrieval process itself or say things like "the provided context does not contain...".
 
 {json_format_instruction}
 
-Medical Literature:
+Retrieved Context:
 {context}
 
 User Question:
@@ -197,18 +243,36 @@ User Question:
                     raw_response = raw_response.replace("```", "", 2).strip()
 
                 try:
-                    return json.loads(raw_response)
-                except json.JSONDecodeError:
+                    parsed = json.loads(raw_response)
+                    if not isinstance(parsed, dict):
+                        raise ValueError("LLM response was not a JSON object")
+                    # Coerce shape defensively: the LLM's own JSON is not schema-validated
+                    # upstream, so a dropped/mistyped key here must not crash the frontend.
+                    summary = parsed.get("summary")
+                    what_to_try = parsed.get("what_to_try")
+                    seek_care_if = parsed.get("seek_care_if")
+                    return {
+                        "summary": summary if isinstance(summary, str) and summary else raw_response,
+                        "what_to_try": what_to_try if isinstance(what_to_try, list) else [],
+                        "seek_care_if": seek_care_if if isinstance(seek_care_if, list) else [],
+                        "sources": sources,
+                        "grounded": grounded
+                    }
+                except (json.JSONDecodeError, ValueError):
                     return {
                         "summary": raw_response,
                         "what_to_try": [],
-                        "seek_care_if": []
+                        "seek_care_if": [],
+                        "sources": sources,
+                        "grounded": grounded
                     }
 
             return {
                 "summary": "LLM service is currently unavailable.",
                 "what_to_try": [],
-                "seek_care_if": []
+                "seek_care_if": [],
+                "sources": [],
+                "grounded": False
             }
 
         except Exception as e:
@@ -216,5 +280,7 @@ User Question:
             return {
                 "summary": f"An internal error occurred: {str(e)}",
                 "what_to_try": [],
-                "seek_care_if": []
+                "seek_care_if": [],
+                "sources": [],
+                "grounded": False
             }

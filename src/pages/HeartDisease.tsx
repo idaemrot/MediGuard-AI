@@ -1,15 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Heart, AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
-import { predictHeart } from '@/api/client';
+import { Heart, Loader2 } from "lucide-react";
+import { predictHeart, checkHealth } from '@/api/client';
 import { toast } from "sonner";
+import ScreeningResult from '@/components/screening/ScreeningResult';
+import ModelUnavailable from '@/components/screening/ModelUnavailable';
 
 const HeartDisease = () => {
   const [loading, setLoading] = useState(false);
+  const [modelReady, setModelReady] = useState<boolean | null>(null);
   const [result, setResult] = useState<number | null>(null);
   const [formData, setFormData] = useState({
     age: 50,
@@ -26,6 +29,18 @@ const HeartDisease = () => {
     ca: 0,
     thal: 1
   });
+
+  useEffect(() => {
+    const verifyModel = async () => {
+      try {
+        const res = await checkHealth();
+        setModelReady(res.data.models.heart);
+      } catch (e) {
+        setModelReady(false);
+      }
+    };
+    verifyModel();
+  }, []);
 
   const handleChange = (name: string, value: any) => {
     setFormData(prev => ({ ...prev, [name]: parseFloat(value) || 0 }));
@@ -45,20 +60,24 @@ const HeartDisease = () => {
     }
   };
 
+  if (modelReady === false) {
+    return <ModelUnavailable label="Heart Disease" />;
+  }
+
   return (
     <div className="container mx-auto py-8 px-4 max-w-4xl">
       <div className="mb-8 flex items-center gap-3">
-        <div className="p-3 bg-red-100 rounded-2xl">
-          <Heart className="w-8 h-8 text-red-600" />
+        <div className="p-2 border border-border rounded-md">
+          <Heart className="w-6 h-6 text-foreground/70" />
         </div>
         <div>
-          <h1 className="text-3xl font-bold">Cardiovascular Risk Evaluation</h1>
-          <p className="text-muted-foreground">Estimate the presence of heart disease using cardiology parameters.</p>
+          <h1 className="text-2xl font-semibold tracking-tight">Cardiovascular Risk Evaluation</h1>
+          <p className="text-muted-foreground text-sm">Estimate the presence of heart disease using cardiology parameters.</p>
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        <Card className="border-none shadow-lg bg-white/50 backdrop-blur-sm">
+        <Card>
           <CardHeader>
             <CardTitle className="text-lg">Clinical Profile</CardTitle>
             <CardDescription>Core cardiovascular risk markers and functional test results.</CardDescription>
@@ -167,35 +186,27 @@ const HeartDisease = () => {
           </CardContent>
         </Card>
 
-        <Button type="submit" className="w-full h-12 text-lg font-semibold rounded-full bg-gradient-to-r from-red-600 to-orange-500 hover:from-red-700 hover:to-orange-600 shadow-xl transition-all" disabled={loading}>
-          {loading ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Analyzing...</> : "Run Cardiac Risk Evaluation"}
+        <Button type="submit" className="w-full h-11" disabled={loading || modelReady === null}>
+          {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Analyzing…</> : "Run Cardiac Risk Evaluation"}
         </Button>
       </form>
 
       {result !== null && (
-        <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          {result === 1 ? (
-            <Card className="bg-red-50 border-red-200 shadow-md">
-              <CardContent className="pt-6 flex gap-4">
-                <AlertTriangle className="w-10 h-10 text-red-600 shrink-0" />
-                <div>
-                  <h3 className="text-xl font-bold text-red-900">Alert: Model Suggests Cardiac Disease Pattern</h3>
-                  <p className="text-red-700 mt-1">The model detected a pattern consistent with elevated risk. Please consult a cardiologist.</p>
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card className="bg-emerald-50 border-emerald-200 shadow-md">
-              <CardContent className="pt-6 flex gap-4">
-                <CheckCircle2 className="w-10 h-10 text-emerald-600 shrink-0" />
-                <div>
-                  <h3 className="text-xl font-bold text-emerald-900">Reassuring: No Strong Cardiac Disease Pattern Detected</h3>
-                  <p className="text-emerald-700 mt-1">Based on the information provided, the model did not detect strong indicators of heart disease.</p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+        <ScreeningResult
+          disease="Heart Disease"
+          isPositive={result === 1}
+          title={result === 1 ? "Cardiac disease pattern detected" : "No strong cardiac disease pattern detected"}
+          message={
+            result === 1
+              ? "The model detected a pattern consistent with elevated risk. Please consult a cardiologist."
+              : "Based on the information provided, the model did not detect strong indicators of heart disease."
+          }
+          assistantQuestion={
+            result === 1
+              ? "My heart disease screening showed elevated risk — what does that mean and what should I do next?"
+              : "My heart disease screening showed low risk — what does that mean and should I still take any precautions?"
+          }
+        />
       )}
     </div>
   );

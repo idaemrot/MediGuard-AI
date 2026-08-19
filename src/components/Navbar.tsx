@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ShieldCheck, Menu, X, Droplets, Heart, Activity, Users, Microscope, Waves } from 'lucide-react';
+import { ShieldCheck, Menu, MessageSquare, Stethoscope } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -14,24 +14,18 @@ const Navbar = () => {
   const [isOpen, setIsOpen] = React.useState(false);
 
   const navItems = [
-    { name: 'Diabetes', path: '/diabetes', icon: <Droplets className="w-4 h-4" /> },
-    { name: 'Heart', path: '/heart', icon: <Heart className="w-4 h-4" /> },
-    { name: 'Parkinson\'s', path: '/parkinsons', icon: <Activity className="w-4 h-4" /> },
-    { name: 'Cancer', path: '/cancer', icon: <Microscope className="w-4 h-4" /> },
-    { name: 'Kidney', path: '/kidney', icon: <Waves className="w-4 h-4" /> },
-    { name: 'Team', path: '/team', icon: <Users className="w-4 h-4" /> },
+    { name: 'Assistant', path: '/', icon: <MessageSquare className="w-4 h-4" /> },
+    { name: 'Health Screening', path: '/screening', icon: <Stethoscope className="w-4 h-4" /> },
   ];
 
   const isActive = (path: string) => location.pathname === path;
 
   return (
-    <nav className="sticky top-0 z-50 w-full border-b bg-white/80 backdrop-blur-md">
-      <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2 group">
-          <div className="p-1.5 bg-blue-600 rounded-lg group-hover:scale-110 transition-transform">
-            <ShieldCheck className="w-5 h-5 text-white" />
-          </div>
-          <span className="font-bold text-xl tracking-tight text-slate-900">MediGuard</span>
+    <nav className="sticky top-0 z-50 w-full border-b border-border bg-background">
+      <div className="container mx-auto px-4 h-14 flex items-center justify-between">
+        <Link to="/" className="flex items-center gap-2">
+          <ShieldCheck className="w-5 h-5 text-foreground/80" />
+          <span className="font-semibold text-base tracking-tight">MediGuard</span>
         </Link>
 
         <div className="hidden md:flex items-center gap-1">
@@ -39,11 +33,12 @@ const Navbar = () => {
             <Link key={item.path} to={item.path}>
               <Button
                 variant="ghost"
+                size="sm"
                 className={cn(
-                  "gap-2 rounded-full px-4",
-                  isActive(item.path) 
-                    ? "bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700" 
-                    : "text-slate-600 hover:text-slate-900"
+                  "gap-2",
+                  isActive(item.path)
+                    ? "bg-accent text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
                 )}
               >
                 {item.icon}
@@ -56,32 +51,32 @@ const Navbar = () => {
         <div className="md:hidden">
           <Sheet open={isOpen} onOpenChange={setIsOpen}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="rounded-full">
-                <Menu className="w-6 h-6" />
+              <Button variant="ghost" size="icon">
+                <Menu className="w-5 h-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-[280px] sm:w-[350px]">
+            <SheetContent side="right" className="w-[280px]">
               <div className="flex flex-col gap-6 mt-8">
-                <Link 
-                  to="/" 
+                <Link
+                  to="/"
                   onClick={() => setIsOpen(false)}
                   className="flex items-center gap-2 px-2"
                 >
-                  <ShieldCheck className="w-6 h-6 text-blue-600" />
-                  <span className="font-bold text-2xl">MediGuard</span>
+                  <ShieldCheck className="w-5 h-5 text-foreground/80" />
+                  <span className="font-semibold text-lg">MediGuard</span>
                 </Link>
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-1">
                   {navItems.map((item) => (
-                    <Link 
-                      key={item.path} 
+                    <Link
+                      key={item.path}
                       to={item.path}
                       onClick={() => setIsOpen(false)}
                     >
                       <div className={cn(
-                        "flex items-center gap-3 px-4 py-3 rounded-xl transition-colors",
+                        "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
                         isActive(item.path)
-                          ? "bg-blue-50 text-blue-600 font-semibold"
-                          : "text-slate-600 hover:bg-slate-50"
+                          ? "bg-accent text-foreground font-medium"
+                          : "text-muted-foreground hover:bg-accent/50"
                       )}>
                         {item.icon}
                         {item.name}

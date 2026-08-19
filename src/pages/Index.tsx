@@ -1,98 +1,50 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Droplets, Heart, Activity, ShieldCheck, ArrowRight, Microscope, Waves } from "lucide-react";
+import React, { useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { ShieldCheck, ArrowRight } from "lucide-react";
+import ChatConversation from '@/components/chat/ChatConversation';
+
+interface LocationState {
+  prefillQuestion?: string;
+}
 
 const Index = () => {
-  const tools = [
-    {
-      title: "Diabetes Prediction",
-      description: "Screen type-2 diabetes risk using metabolic parameters.",
-      icon: <Droplets className="w-8 h-8 text-blue-600" />,
-      link: "/diabetes",
-      color: "bg-blue-50/50",
-      borderColor: "hover:border-blue-200"
-    },
-    {
-      title: "Heart Disease",
-      description: "Estimate cardiovascular risk using clinical markers.",
-      icon: <Heart className="w-8 h-8 text-red-600" />,
-      link: "/heart",
-      color: "bg-red-50/50",
-      borderColor: "hover:border-red-200"
-    },
-    {
-      title: "Parkinson's Disease",
-      description: "Voice-based screening using acoustic biomarkers.",
-      icon: <Activity className="w-8 h-8 text-purple-600" />,
-      link: "/parkinsons",
-      color: "bg-purple-50/50",
-      borderColor: "hover:border-purple-200"
-    },
-    {
-      title: "Cancer Detection",
-      description: "Breast cancer screening using clinical nuclei parameters.",
-      icon: <Microscope className="w-8 h-8 text-rose-600" />,
-      link: "/cancer",
-      color: "bg-rose-50/50",
-      borderColor: "hover:border-rose-200"
-    },
-    {
-      title: "Kidney Disease",
-      description: "Chronic kidney disease risk evaluation using lab markers.",
-      icon: <Waves className="w-8 h-8 text-emerald-600" />,
-      link: "/kidney",
-      color: "bg-emerald-50/50",
-      borderColor: "hover:border-emerald-200"
-    }
-  ];
+  const location = useLocation();
+  const navigate = useNavigate();
+  const state = location.state as LocationState | null;
+  const [prefillQuestion] = useState(state?.prefillQuestion);
+
+  const clearPrefill = () => {
+    navigate(location.pathname, { replace: true, state: {} });
+  };
 
   return (
-    <div className="min-h-screen">
-      <div className="container mx-auto py-16 px-4">
-        <div className="max-w-3xl mx-auto text-center mb-16">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-100 text-blue-700 text-sm font-medium mb-6">
-            <ShieldCheck className="w-4 h-4" />
-            AI-Powered Health Screening
+    <div className="container mx-auto py-8 px-4 max-w-3xl h-[calc(100vh-56px)] flex flex-col">
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2 border border-border rounded-md">
+            <ShieldCheck className="w-6 h-6 text-foreground/70" />
           </div>
-          <h1 className="text-5xl font-extrabold tracking-tight text-slate-900 mb-6">
-            MediGuard <span className="text-blue-600">AI Assistant</span>
-          </h1>
-          <p className="text-xl text-slate-600 leading-relaxed">
-            Advanced machine learning models designed for early risk detection and health information.
-          </p>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">MediGuard Assistant</h1>
+            <p className="text-sm text-muted-foreground">
+              Grounded in retrieved medical literature where available. Not a substitute for professional care.
+            </p>
+          </div>
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
-          {tools.map((tool, idx) => (
-            <Link key={idx} to={tool.link} className="group">
-              <Card className={`h-full border-2 border-transparent transition-all duration-300 ${tool.borderColor} hover:shadow-2xl hover:-translate-y-1 overflow-hidden bg-white/80 backdrop-blur-sm`}>
-                <CardHeader className={`${tool.color} pb-8`}>
-                  <div className="mb-4 p-3 bg-white rounded-2xl w-fit shadow-sm group-hover:scale-110 transition-transform">
-                    {tool.icon}
-                  </div>
-                  <CardTitle className="text-xl">{tool.title}</CardTitle>
-                  <CardDescription className="text-slate-600 text-sm">
-                    {tool.description}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="pt-6">
-                  <div className="flex items-center text-sm font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">
-                    Start Now <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
-        </div>
-
-        <div className="mt-20 max-w-2xl mx-auto p-6 rounded-2xl border border-dashed border-slate-300 bg-white/30 backdrop-blur-sm text-center">
-          <p className="text-sm text-slate-500 italic">
-            <b>Disclaimer</b>: This assistant provides risk estimation and information based on model patterns and literature. 
-            It is not a substitute for clinical diagnosis or professional medical advice.
-          </p>
-        </div>
+        <Link
+          to="/screening"
+          className="hidden sm:flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground shrink-0 whitespace-nowrap pt-2"
+        >
+          Health Screening tools <ArrowRight className="w-3.5 h-3.5" />
+        </Link>
       </div>
+
+      <ChatConversation
+        variant="full"
+        className="flex-1"
+        initialMessage={prefillQuestion}
+        onInitialMessageSent={clearPrefill}
+      />
     </div>
   );
 };

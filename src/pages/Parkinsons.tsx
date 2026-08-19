@@ -3,17 +3,19 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Activity, AlertTriangle, CheckCircle2, Loader2, ChevronRight, ChevronLeft, ShieldAlert } from "lucide-react";
+import { Activity, Loader2, ChevronRight, ChevronLeft } from "lucide-react";
 import { predictParkinsons, checkHealth } from '@/api/client';
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
+import ModelUnavailable from '@/components/screening/ModelUnavailable';
+import ScreeningResult from '@/components/screening/ScreeningResult';
 
 const Parkinsons = () => {
   const [loading, setLoading] = useState(false);
   const [modelReady, setModelReady] = useState<boolean | null>(null);
   const [result, setResult] = useState<number | null>(null);
   const [step, setStep] = useState(1);
-  
+
   const [formData, setFormData] = useState({
     fo: 119.99, fhi: 157.30, flo: 74.99,
     jitter_percent: 0.00784, jitter_abs: 0.00007, rap: 0.00370, ppq: 0.00554, ddp: 0.01109,
@@ -54,33 +56,26 @@ const Parkinsons = () => {
   };
 
   if (modelReady === false) {
-    return (
-      <div className="container mx-auto py-20 px-4 text-center">
-        <ShieldAlert className="w-16 h-16 text-red-500 mx-auto mb-4" />
-        <h2 className="text-2xl font-bold">Model Unavailable</h2>
-        <p className="text-muted-foreground mt-2">The Parkinson's analysis model is not loaded on the server.</p>
-        <Button className="mt-6" onClick={() => window.location.reload()}>Retry Connection</Button>
-      </div>
-    );
+    return <ModelUnavailable label="Parkinson's" />;
   }
 
   return (
     <div className="container mx-auto py-8 px-4 max-w-3xl">
       <div className="mb-8 flex items-center gap-3">
-        <div className="p-3 bg-purple-100 rounded-2xl">
-          <Activity className="w-8 h-8 text-purple-600" />
+        <div className="p-2 border border-border rounded-md">
+          <Activity className="w-6 h-6 text-foreground/70" />
         </div>
         <div>
-          <h1 className="text-3xl font-bold">Parkinson’s Voice Screening</h1>
-          <p className="text-muted-foreground">Step {step} of 4: Acoustic Biomarkers</p>
+          <h1 className="text-2xl font-semibold tracking-tight">Parkinson's Voice Screening</h1>
+          <p className="text-muted-foreground text-sm">Step {step} of 4: Acoustic Biomarkers</p>
         </div>
       </div>
 
-      <Progress value={(step / 4) * 100} className="mb-8 h-2" />
+      <Progress value={(step / 4) * 100} className="mb-8 h-1.5" />
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {step === 1 && (
-          <Card className="border-none shadow-lg bg-white/50 backdrop-blur-sm animate-in fade-in slide-in-from-right-4">
+          <Card>
             <CardHeader>
               <CardTitle>Frequency Parameters</CardTitle>
               <CardDescription>Fundamental frequency measurements in Hertz.</CardDescription>
@@ -103,7 +98,7 @@ const Parkinsons = () => {
         )}
 
         {step === 2 && (
-          <Card className="border-none shadow-lg bg-white/50 backdrop-blur-sm animate-in fade-in slide-in-from-right-4">
+          <Card>
             <CardHeader>
               <CardTitle>Jitter Metrics</CardTitle>
               <CardDescription>Measures of variation in fundamental frequency.</CardDescription>
@@ -119,7 +114,7 @@ const Parkinsons = () => {
         )}
 
         {step === 3 && (
-          <Card className="border-none shadow-lg bg-white/50 backdrop-blur-sm animate-in fade-in slide-in-from-right-4">
+          <Card>
             <CardHeader>
               <CardTitle>Shimmer Metrics</CardTitle>
               <CardDescription>Measures of variation in amplitude.</CardDescription>
@@ -136,7 +131,7 @@ const Parkinsons = () => {
         )}
 
         {step === 4 && (
-          <Card className="border-none shadow-lg bg-white/50 backdrop-blur-sm animate-in fade-in slide-in-from-right-4">
+          <Card>
             <CardHeader>
               <CardTitle>Harmonicity & Dynamics</CardTitle>
               <CardDescription>Non-linear measures of voice signal complexity.</CardDescription>
@@ -161,41 +156,33 @@ const Parkinsons = () => {
             </Button>
           )}
           {step < 4 ? (
-            <Button type="button" className="flex-1 bg-purple-600 hover:bg-purple-700" onClick={() => setStep(s => s + 1)}>
+            <Button type="button" className="flex-1" onClick={() => setStep(s => s + 1)}>
               Next <ChevronRight className="ml-2 h-4 w-4" />
             </Button>
           ) : (
-            <Button type="submit" className="flex-1 bg-gradient-to-r from-purple-600 to-pink-500" disabled={loading}>
-              {loading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : "Run Analysis"}
+            <Button type="submit" className="flex-1" disabled={loading}>
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Run Analysis"}
             </Button>
           )}
         </div>
       </form>
 
       {result !== null && (
-        <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          {result === 1 ? (
-            <Card className="bg-red-50 border-red-200 shadow-md">
-              <CardContent className="pt-6 flex gap-4">
-                <AlertTriangle className="w-10 h-10 text-red-600 shrink-0" />
-                <div>
-                  <h3 className="text-xl font-bold text-red-900">Positive Screen Detected</h3>
-                  <p className="text-red-700 mt-1">The model detected a pattern consistent with Parkinson's disease. Please consult a neurologist.</p>
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card className="bg-emerald-50 border-emerald-200 shadow-md">
-              <CardContent className="pt-6 flex gap-4">
-                <CheckCircle2 className="w-10 h-10 text-emerald-600 shrink-0" />
-                <div>
-                  <h3 className="text-xl font-bold text-emerald-900">Negative Screen Detected</h3>
-                  <p className="text-emerald-700 mt-1">Based on the information provided, the model did not detect strong indicators of Parkinson's.</p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+        <ScreeningResult
+          disease="Parkinson's"
+          isPositive={result === 1}
+          title={result === 1 ? "Positive screen detected" : "Negative screen detected"}
+          message={
+            result === 1
+              ? "The model detected a pattern consistent with Parkinson's disease. Please consult a neurologist."
+              : "Based on the information provided, the model did not detect strong indicators of Parkinson's."
+          }
+          assistantQuestion={
+            result === 1
+              ? "My Parkinson's voice screening was positive — what does that mean and what should I do next?"
+              : "My Parkinson's voice screening was negative — what does that mean and should I still take any precautions?"
+          }
+        />
       )}
     </div>
   );

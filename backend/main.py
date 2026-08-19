@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 import os
 from dotenv import load_dotenv
@@ -158,7 +159,9 @@ async def health_check():
 @app.post("/chat")
 async def chat_endpoint(data: ChatInput):
     """RAG-powered medical chatbot endpoint."""
-    response = rag_engine.get_response(data.message)
+    # get_response() makes blocking Groq/FAISS calls; running it in a threadpool
+    # keeps the event loop free so concurrent requests aren't serialized behind it.
+    response = await run_in_threadpool(rag_engine.get_response, data.message)
     return {"response": response}
 
 @app.post("/predict/diabetes")

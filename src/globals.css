@@ -32,7 +32,7 @@
     --input: 214.3 31.8% 88%;
     --ring: 222.2 84% 4.9%;
 
-    --radius: 1.25rem;
+    --radius: 0.5rem;
 
     --sidebar-background: 215 25% 97%;
     --sidebar-foreground: 240 5.3% 26.1%;
@@ -89,8 +89,6 @@
   }
 
   body {
-    @apply text-foreground antialiased min-h-screen;
-    background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 50%, #f5f3ff 100%);
-    background-attachment: fixed;
+    @apply bg-background text-foreground antialiased min-h-screen;
   }
 }

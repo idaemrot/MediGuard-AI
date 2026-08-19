@@ -4,15 +4,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Activity, AlertTriangle, CheckCircle2, Loader2, ShieldAlert } from "lucide-react";
+import { Waves, Loader2 } from "lucide-react";
 import { predictKidney, checkHealth } from '@/api/client';
 import { toast } from "sonner";
+import ModelUnavailable from '@/components/screening/ModelUnavailable';
+import ScreeningResult from '@/components/screening/ScreeningResult';
 
 const Kidney = () => {
   const [loading, setLoading] = useState(false);
   const [modelReady, setModelReady] = useState<boolean | null>(null);
   const [result, setResult] = useState<number | null>(null);
-  
+
   const [formData, setFormData] = useState({
     age: 48, bp: 80, al: 1, su: 0, rbc: 1, pc: 1, pcc: 0, ba: 0,
     bgr: 121, bu: 36, sc: 1.2, pot: 4.5, wc: 7800,
@@ -50,30 +52,23 @@ const Kidney = () => {
   };
 
   if (modelReady === false) {
-    return (
-      <div className="container mx-auto py-20 px-4 text-center">
-        <ShieldAlert className="w-16 h-16 text-red-500 mx-auto mb-4" />
-        <h2 className="text-2xl font-bold">Model Unavailable</h2>
-        <p className="text-muted-foreground mt-2">The Kidney analysis model is not loaded on the server.</p>
-        <Button className="mt-6" onClick={() => window.location.reload()}>Retry Connection</Button>
-      </div>
-    );
+    return <ModelUnavailable label="Kidney" />;
   }
 
   return (
     <div className="container mx-auto py-8 px-4 max-w-4xl">
       <div className="mb-8 flex items-center gap-3">
-        <div className="p-3 bg-emerald-100 rounded-2xl">
-          <Activity className="w-8 h-8 text-emerald-600" />
+        <div className="p-2 border border-border rounded-md">
+          <Waves className="w-6 h-6 text-foreground/70" />
         </div>
         <div>
-          <h1 className="text-3xl font-bold">Kidney Disease Screening</h1>
-          <p className="text-muted-foreground">Evaluate chronic kidney disease risk using clinical parameters.</p>
+          <h1 className="text-2xl font-semibold tracking-tight">Kidney Disease Screening</h1>
+          <p className="text-muted-foreground text-sm">Evaluate chronic kidney disease risk using clinical parameters.</p>
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        <Card className="border-none shadow-lg bg-white/50 backdrop-blur-sm">
+        <Card>
           <CardHeader>
             <CardTitle className="text-lg">Clinical Profile</CardTitle>
             <CardDescription>Enter values from recent laboratory reports.</CardDescription>
@@ -208,35 +203,27 @@ const Kidney = () => {
           </CardContent>
         </Card>
 
-        <Button type="submit" className="w-full h-12 text-lg font-semibold rounded-full bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-700 hover:to-teal-600 shadow-xl transition-all" disabled={loading}>
-          {loading ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Analyzing...</> : "Run Kidney Risk Analysis"}
+        <Button type="submit" className="w-full h-11" disabled={loading}>
+          {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Analyzing…</> : "Run Kidney Risk Analysis"}
         </Button>
       </form>
 
       {result !== null && (
-        <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          {result === 1 ? (
-            <Card className="bg-red-50 border-red-200 shadow-md">
-              <CardContent className="pt-6 flex gap-4">
-                <AlertTriangle className="w-10 h-10 text-red-600 shrink-0" />
-                <div>
-                  <h3 className="text-xl font-bold text-red-900">CKD Pattern Detected</h3>
-                  <p className="text-red-700 mt-1">The model detected a pattern consistent with Chronic Kidney Disease. Please consult a nephrologist.</p>
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card className="bg-emerald-50 border-emerald-200 shadow-md">
-              <CardContent className="pt-6 flex gap-4">
-                <CheckCircle2 className="w-10 h-10 text-emerald-600 shrink-0" />
-                <div>
-                  <h3 className="text-xl font-bold text-emerald-900">No CKD Pattern Detected</h3>
-                  <p className="text-emerald-700 mt-1">Based on the information provided, the model did not detect strong indicators of kidney disease.</p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+        <ScreeningResult
+          disease="Kidney Disease"
+          isPositive={result === 1}
+          title={result === 1 ? "CKD pattern detected" : "No CKD pattern detected"}
+          message={
+            result === 1
+              ? "The model detected a pattern consistent with Chronic Kidney Disease. Please consult a nephrologist."
+              : "Based on the information provided, the model did not detect strong indicators of kidney disease."
+          }
+          assistantQuestion={
+            result === 1
+              ? "My kidney disease screening showed a CKD pattern — what does that mean and what should I do next?"
+              : "My kidney disease screening showed no CKD pattern — what does that mean and should I still take any precautions?"
+          }
+        />
       )}
     </div>
   );
