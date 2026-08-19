@@ -124,6 +124,9 @@ export interface MedicalResponse {
   seek_care_if: string[];
   sources?: string[];
   grounded?: boolean;
+  // True for local greeting/small-talk replies (never sent through Groq/FAISS) —
+  // these should render as plain assistant messages, with no grounding badge.
+  conversational?: boolean;
 }
 
 export interface ChatResponse {

@@ -84,7 +84,7 @@ const ChatConversation: React.FC<ChatConversationProps> = ({
 
     return (
       <div className={cn("space-y-3", compact && "space-y-2")}>
-        {typeof content.grounded === 'boolean' && (
+        {!content.conversational && typeof content.grounded === 'boolean' && (
           <div className="flex items-center gap-1.5 text-[11px] font-medium text-foreground/50">
             <span className={cn(
               "w-1.5 h-1.5 rounded-full",

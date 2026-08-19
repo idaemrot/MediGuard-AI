@@ -15,6 +15,9 @@ dist-ssr
 # Environment variables
 .env
 
+# Claude Code project-level config/skills
+.claude/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

@@ -1,7 +1,9 @@
 import os
+import re
 import json
 import traceback
 from pathlib import Path
+from typing import Optional
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -25,6 +27,76 @@ DB_FAISS_PATH = Path(__file__).parent / "vectorstores" / "db_faiss"
 # on-topic cluster with a clear margin below the off-topic one.
 EVIDENCE_DISTANCE_THRESHOLD = 1.0
 
+# ==========================================
+# LOCAL GREETING / SMALL-TALK HANDLER
+# ==========================================
+# Deliberately a small, exact-match whitelist — NOT substring/fuzzy matching, and
+# NOT an LLM call. This must never grow into general conversation handling, and it
+# must never risk swallowing real medical text (e.g. "I have a fever" is nowhere
+# close to any entry below, even after normalization).
+
+_GREETING_REPLY = "Hello! I'm MediGuard. How can I help you with a health-related question today?"
+_HOW_ARE_YOU_REPLY = (
+    "I'm doing well, thank you. I'm here to help with health-related questions. "
+    "What would you like to know?"
+)
+_THANKS_REPLY = "You're welcome. Let me know if you have another health-related question."
+_BYE_REPLY = "Goodbye. Feel free to come back anytime you have a health-related question."
+
+_SMALL_TALK_PHRASES = {
+    "hi": _GREETING_REPLY,
+    "hello": _GREETING_REPLY,
+    "hey": _GREETING_REPLY,
+    "yo": _GREETING_REPLY,
+    "greetings": _GREETING_REPLY,
+    "good morning": _GREETING_REPLY,
+    "good afternoon": _GREETING_REPLY,
+    "good evening": _GREETING_REPLY,
+    "how are you": _HOW_ARE_YOU_REPLY,
+    "how are you doing": _HOW_ARE_YOU_REPLY,
+    "hows it going": _HOW_ARE_YOU_REPLY,
+    "thanks": _THANKS_REPLY,
+    "thank you": _THANKS_REPLY,
+    "thanks a lot": _THANKS_REPLY,
+    "thank you so much": _THANKS_REPLY,
+    "bye": _BYE_REPLY,
+    "goodbye": _BYE_REPLY,
+    "bye bye": _BYE_REPLY,
+    "see you": _BYE_REPLY,
+}
+
+_NON_LETTER_RE = re.compile(r"[^a-z\s]")
+_REPEATED_CHAR_RE = re.compile(r"(.)\1+")
+_WHITESPACE_RE = re.compile(r"\s+")
+
+
+def _normalize_small_talk(text: str) -> str:
+    """
+    Lowercase, drop punctuation, and collapse repeated letters so casual variants
+    ("Hiii!!", "heyyy", "THANKS.") match the same canonical form as the whitelist
+    entries (which are normalized with this same function, so e.g. "hello"'s
+    double-l collapses on both sides consistently).
+    """
+    lowered = text.strip().lower()
+    letters_only = _NON_LETTER_RE.sub(" ", lowered)
+    collapsed = _REPEATED_CHAR_RE.sub(r"\1", letters_only)
+    return _WHITESPACE_RE.sub(" ", collapsed).strip()
+
+
+_SMALL_TALK_LOOKUP = {
+    _normalize_small_talk(phrase): reply for phrase, reply in _SMALL_TALK_PHRASES.items()
+}
+
+
+def detect_small_talk(query: str) -> Optional[str]:
+    """
+    Returns a canned reply if the *entire* message is a greeting or basic
+    conversational filler, or None otherwise. Exact-match only (post-normalization)
+    so real medical text can never be misclassified as small talk just because it
+    contains a short word somewhere in it.
+    """
+    return _SMALL_TALK_LOOKUP.get(_normalize_small_talk(query))
+
 
 class MedicalRAG:
     def __init__(self):
@@ -32,7 +104,15 @@ class MedicalRAG:
         self.vector_store = None
         self.embeddings = None
         self.groq_client = None
-        self.model = "llama-3.1-8b-instant"
+        # "llama-3.1-8b-instant" was retired from Groq's catalog (confirmed via a live
+        # 404 from the API and this account's /models list, which no longer includes
+        # it) — every Groq call in this class was silently failing into fail-safe
+        # fallbacks. Verified live against this account: gpt-oss-20b classifies and
+        # generates correctly. It's a reasoning model, so calls need a real max_tokens
+        # budget (reasoning tokens count against it even though hidden from `content`)
+        # and reasoning_effort="low" to keep latency reasonable for a single-word or
+        # short-JSON task.
+        self.model = "openai/gpt-oss-20b"
 
     # ==========================================
     # INITIALIZATION
@@ -114,10 +194,11 @@ Question:
                 model=self.model,
                 messages=[{"role": "user", "content": classification_prompt}],
                 temperature=0,
-                max_tokens=5,
+                max_tokens=150,
+                reasoning_effort="low",
             )
 
-            decision = response.choices[0].message.content.strip().upper()
+            decision = (response.choices[0].message.content or "").strip().upper()
             # Check for the NON_MEDICAL prefix rather than exact-matching "MEDICAL":
             # a truncated/punctuated reply like "MEDICAL." still correctly classifies as medical.
             return not decision.startswith("NON")
@@ -129,13 +210,27 @@ Question:
     # MAIN RESPONSE FUNCTION
     # ==========================================
     def get_response(self, query: str):
+        # Step 0: local greeting/small-talk handler — before initialization checks,
+        # before the classifier, before Groq/FAISS. No external calls at all.
+        small_talk_reply = detect_small_talk(query)
+        if small_talk_reply is not None:
+            return {
+                "summary": small_talk_reply,
+                "what_to_try": [],
+                "seek_care_if": [],
+                "sources": [],
+                "grounded": False,
+                "conversational": True
+            }
+
         if not self.is_initialized:
             return {
                 "summary": "The medical assistant is still initializing.",
                 "what_to_try": [],
                 "seek_care_if": [],
                 "sources": [],
-                "grounded": False
+                "grounded": False,
+                "conversational": False
             }
 
         try:
@@ -146,7 +241,8 @@ Question:
                     "what_to_try": [],
                     "seek_care_if": [],
                     "sources": [],
-                    "grounded": False
+                    "grounded": False,
+                    "conversational": False
                 }
 
             # Step 2: Retrieve documents if FAISS available.
@@ -232,9 +328,10 @@ User Question:
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0.2,
                     max_tokens=400,
+                    reasoning_effort="low",
                 )
 
-                raw_response = completion.choices[0].message.content.strip()
+                raw_response = (completion.choices[0].message.content or "").strip()
 
                 # Clean accidental markdown
                 if raw_response.startswith("```json"):
@@ -256,7 +353,8 @@ User Question:
                         "what_to_try": what_to_try if isinstance(what_to_try, list) else [],
                         "seek_care_if": seek_care_if if isinstance(seek_care_if, list) else [],
                         "sources": sources,
-                        "grounded": grounded
+                        "grounded": grounded,
+                        "conversational": False
                     }
                 except (json.JSONDecodeError, ValueError):
                     return {
@@ -264,7 +362,8 @@ User Question:
                         "what_to_try": [],
                         "seek_care_if": [],
                         "sources": sources,
-                        "grounded": grounded
+                        "grounded": grounded,
+                        "conversational": False
                     }
 
             return {
@@ -272,7 +371,8 @@ User Question:
                 "what_to_try": [],
                 "seek_care_if": [],
                 "sources": [],
-                "grounded": False
+                "grounded": False,
+                "conversational": False
             }
 
         except Exception as e:
@@ -282,5 +382,6 @@ User Question:
                 "what_to_try": [],
                 "seek_care_if": [],
                 "sources": [],
-                "grounded": False
+                "grounded": False,
+                "conversational": False
             }
